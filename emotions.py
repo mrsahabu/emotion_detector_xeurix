@@ -285,9 +285,10 @@ class emotion_analyzer():
         self.predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
         self.emotion_target_size = self.emotion_classifier.input_shape[1:3]
 
-    def emotion_recognition(self, bgr_image, lipdistance, eyeblink):
+    def emotion_recognition(self, bgr_image, lipdistance, eyeblink, expressionthreshold,):
         EYE_BLINK_THRESHOLD = eyeblink
         LIPS_DISTANCE_THRESHOLD = lipdistance
+        EXPRESSION_THRESHOLD = expressionthreshold
         IS_LIP = True
         emotion_window = []
         blink = 0
@@ -296,6 +297,13 @@ class emotion_analyzer():
 
         faces = self.detector(rgb_image)
         for face_coordinates in faces:
+            _, _, w, h = face_utils.rect_to_bb(face_coordinates)
+
+            areaofface = w * h
+            if areaofface <= 15000:
+                bgr_image = cv2.resize(bgr_image, (720, 640))
+                return bgr_image, areaofface
+            
             face_cords = []
             emotion = []
             stress_level = []
@@ -380,6 +388,7 @@ class emotion_analyzer():
             color = color.astype(int)
             color = color.tolist()
 
+
             draw_bounding_box(face_utils.rect_to_bb(face_coordinates), rgb_image, color)
             draw_text(face_utils.rect_to_bb(face_coordinates), rgb_image, emotion_mode,
                       color, 0, -45, 1, 1)
@@ -409,10 +418,13 @@ class emotion_analyzer():
 
                 expression_level = (dist.euclidean(centerOfLeftEyeBrow, midLeftEye) + dist.euclidean(
                     centerOfRightEyeBrow, midRightEye)) / 2
+
+
                 left.append(expression_level)
-                cv2.putText(bgr_image, "Expression level:{}".format(str(int(expression_level))), (20, 60),
-                            cv2.FONT_HERSHEY_SIMPLEX,
-                            1, (0, 0, 0), 2)
+                if expression_level > EXPRESSION_THRESHOLD:
+                    cv2.putText(bgr_image, "Expression level:{}".format(str(int(expression_level))), (20, 60),
+                                cv2.FONT_HERSHEY_SIMPLEX,
+                                1, (0, 0, 0), 2)
                 cv2.putText(bgr_image, "Emotion prob:{}".format(str(int(emotion_probability * 100))), (20, 120),
                             cv2.FONT_HERSHEY_SIMPLEX,
                             1, (0, 0, 0), 2)
@@ -420,6 +432,12 @@ class emotion_analyzer():
                             cv2.FONT_HERSHEY_SIMPLEX,
                             1, (0, 0, 0), 2)
                 cv2.putText(bgr_image, "EYE Distance:{}".format(str(float(EYE_BLINK_THRESHOLD))), (20, 260),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            1, (0, 0, 0), 2)
+                cv2.putText(bgr_image, "Expression Threshold:{}".format(str(float(EXPRESSION_THRESHOLD))), (20, 320),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            1, (0, 0, 0), 2)
+                cv2.putText(bgr_image, "Area of Face:{}".format(str(float(areaofface))), (20, 360),
                             cv2.FONT_HERSHEY_SIMPLEX,
                             1, (0, 0, 0), 2)
                 stress_value, stress_label = normalize_values(points, distq)
@@ -435,7 +453,7 @@ class emotion_analyzer():
                             cv2.FONT_HERSHEY_SIMPLEX,
                             1, (0, 0, 0), 2)
                 if lips_distance > LIPS_DISTANCE_THRESHOLD:
-                    cv2.putText(bgr_image, "{}_{}".format('Smiled', LIPS_DISTANCE_THRESHOLD), (20, 300),
+                    cv2.putText(bgr_image, "{}: {}".format('Person Smiled', lipdistance), (20, 300),
                                 cv2.FONT_HERSHEY_SIMPLEX,
                                 1, (0, 0, 0), 2)
                 if ear < EYE_BLINK_THRESHOLD:
@@ -449,7 +467,7 @@ class emotion_analyzer():
                                 1, (0, 0, 0), 2)
             except Exception as e:
                 print('Unhandled exception occurred : {}'.format(e))
-            bgr_image = cv2.resize(bgr_image, (640, 480))
-            return bgr_image
+            bgr_image = cv2.resize(bgr_image, (720, 640))
+            return bgr_image, areaofface
 # df= emotion_recognition('c.mov')
 # print(df)
